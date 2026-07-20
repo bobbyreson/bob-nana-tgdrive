@@ -2,12 +2,15 @@ import os
 import asyncio
 import asyncpg
 from pyrogram import Client, filters
+from aiohttp import web
 
 # ================= 配置区 =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 DATABASE_URL = os.getenv("DATABASE_URL")
+# Render 会自动在后台注入一个 PORT 变量，我们必须监听它
+PORT = int(os.getenv("PORT", 10000)) 
 
 # 初始化 Pyrogram Client
 bot = Client("tg_drive_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -80,9 +83,23 @@ async def get_file(client, message):
     except Exception as e:
         await message.reply_text("❌ 文件提取失败，可能 file_id 无效。")
 
+# ================= Web 服务 (应付 Render 健康检查) =================
+async def web_handler(request):
+    return web.Response(text="✅ Telegram Drive Bot is running perfectly!")
+
 # ================= 主入口 =================
 async def main():
     await init_db()
+    
+    # 启动 aiohttp Web 服务以通过 Render 的健康检查
+    server = web.Server(web_handler)
+    runner = web.ServerRunner(server)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', PORT)
+    await site.start()
+    print(f"Web server started on port {PORT}")
+
+    # 启动 Telegram Bot
     await bot.start()
     print("Bot is successfully running on Render!")
     await asyncio.Event().wait()
