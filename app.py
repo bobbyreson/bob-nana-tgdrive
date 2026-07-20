@@ -109,3 +109,12 @@ async def main():
     await bot.start()
     print("--- Bot 启动成功，正在等待消息 ---")
     await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        print(f"!!! 致命错误: {e}")
+        # 为了防止程序因为这个错误立刻关闭，我们让它睡一会儿
+        import time
+        time.sleep(300)
