@@ -38,11 +38,11 @@ async def init_db():
     print("Database initialized.")
 
 # ================= Bot 逻辑 =================
-@bot.on_message(filters.command("start") & auth)
+@bot.on_message(filters.command("start"))
 async def start_cmd(client, message):
     await message.reply_text("👋 欢迎主人！安全锁已激活，现在我只为你一个人服务。\n发送 /list 查看你的文件。")
 
-@bot.on_message((filters.document | filters.video | filters.audio) & auth)
+@bot.on_message((filters.document | filters.video | filters.audio))
 async def handle_file(client, message):
     file_obj = getattr(message, message.media.value)
     file_name = getattr(file_obj, 'file_name', f"Unnamed_{message.media.value}")
@@ -61,7 +61,7 @@ async def handle_file(client, message):
     finally:
         await conn.close()
 
-@bot.on_message(filters.command("list") & auth)
+@bot.on_message(filters.command("list"))
 async def list_files(client, message):
     conn = await asyncpg.connect(DATABASE_URL)
     records = await conn.fetch('SELECT id, file_name, file_id FROM files ORDER BY id DESC LIMIT 10')
@@ -77,7 +77,7 @@ async def list_files(client, message):
     
     await message.reply_text(text)
 
-@bot.on_message(filters.command("get") & filters.private & auth)
+@bot.on_message(filters.command("get") & filters.private)
 async def get_file(client, message):
     if len(message.command) < 2:
         await message.reply_text("⚠️ 请提供提取码。例如: `/get file_id`")
