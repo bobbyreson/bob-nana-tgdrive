@@ -95,16 +95,17 @@ async def web_handler(request):
 
 # ================= 主入口 =================
 async def main():
+    print("--- 正在初始化数据库 ---")
     await init_db()
+    
+    print("--- 正在启动 Web 服务 ---")
     server = web.Server(web_handler)
     runner = web.ServerRunner(server)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
     
+    print("--- 正在连接 Telegram 服务器 (Bot.start) ---")
     await bot.start()
-    print("Bot is successfully running on Render!")
+    print("--- Bot 启动成功，正在等待消息 ---")
     await asyncio.Event().wait()
-
-if __name__ == "__main__":
-    asyncio.run(main())
