@@ -1,5 +1,11 @@
-import os
+# 🌟 必须加在最顶部的补丁，解决 Python 3.14 触发的事件循环报错
 import asyncio
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+import os
 import asyncpg
 from pyrogram import Client, filters
 from aiohttp import web
@@ -9,11 +15,11 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 DATABASE_URL = os.getenv("DATABASE_URL")
-# Render 会自动在后台注入一个 PORT 变量，我们必须监听它
-PORT = int(os.getenv("PORT", 10000)) 
+PORT = int(os.getenv("PORT", 10000))
+OWNER_ID = int(os.getenv("OWNER_ID", 0))
 
-# 初始化 Pyrogram Client
 bot = Client("tg_drive_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+auth = filters.user(OWNER_ID)
 
 # ================= 数据库操作 =================
 async def init_db():
@@ -32,11 +38,11 @@ async def init_db():
     print("Database initialized.")
 
 # ================= Bot 逻辑 =================
-@bot.on_message(filters.command("start"))
+@bot.on_message(filters.command("start") & auth)
 async def start_cmd(client, message):
-    await message.reply_text("👋 欢迎使用私人 TG 网盘！\n直接向我发送任何文件，我会将它们记录在 Neon 中。\n发送 /list 查看你的文件。")
+    await message.reply_text("👋 欢迎主人！安全锁已激活，现在我只为你一个人服务。\n发送 /list 查看你的文件。")
 
-@bot.on_message(filters.document | filters.video | filters.audio)
+@bot.on_message((filters.document | filters.video | filters.audio) & auth)
 async def handle_file(client, message):
     file_obj = getattr(message, message.media.value)
     file_name = getattr(file_obj, 'file_name', f"Unnamed_{message.media.value}")
@@ -55,7 +61,7 @@ async def handle_file(client, message):
     finally:
         await conn.close()
 
-@bot.on_message(filters.command("list"))
+@bot.on_message(filters.command("list") & auth)
 async def list_files(client, message):
     conn = await asyncpg.connect(DATABASE_URL)
     records = await conn.fetch('SELECT id, file_name, file_id FROM files ORDER BY id DESC LIMIT 10')
@@ -71,7 +77,7 @@ async def list_files(client, message):
     
     await message.reply_text(text)
 
-@bot.on_message(filters.command("get") & filters.private)
+@bot.on_message(filters.command("get") & filters.private & auth)
 async def get_file(client, message):
     if len(message.command) < 2:
         await message.reply_text("⚠️ 请提供提取码。例如: `/get file_id`")
@@ -83,23 +89,19 @@ async def get_file(client, message):
     except Exception as e:
         await message.reply_text("❌ 文件提取失败，可能 file_id 无效。")
 
-# ================= Web 服务 (应付 Render 健康检查) =================
+# ================= Web 服务 (应付 Render) =================
 async def web_handler(request):
-    return web.Response(text="✅ Telegram Drive Bot is running perfectly!")
+    return web.Response(text="✅ Telegram Drive Bot is running perfectly with Python 3.14 patch!")
 
 # ================= 主入口 =================
 async def main():
     await init_db()
-    
-    # 启动 aiohttp Web 服务以通过 Render 的健康检查
     server = web.Server(web_handler)
     runner = web.ServerRunner(server)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
-    print(f"Web server started on port {PORT}")
-
-    # 启动 Telegram Bot
+    
     await bot.start()
     print("Bot is successfully running on Render!")
     await asyncio.Event().wait()
